@@ -42,7 +42,6 @@ parser.add_argument("--batch-solve-bsz", default=-1, type=int)
 
 # cuda
 parser.add_argument("--cuda-num", default=0, type=int)
-parser.add_argument("--do-cuda", action="store_true")
 
 # kernel
 parser.add_argument("--kernel", default="Mat32", type=str,
@@ -241,7 +240,7 @@ if args.fit_models:
                   'maxiter_cg': args.maxiter_cg,  # training maxiter
                   'predict_maxiter_cg': args.predict_maxiter_cg,
 
-                  'do_cuda': args.do_cuda,
+                  'do_cuda': torch.cuda.is_available(),
                   'cuda_num': args.cuda_num,
 
                   'batch_solve_bsz': args.batch_solve_bsz,
