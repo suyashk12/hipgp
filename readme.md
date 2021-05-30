@@ -1,6 +1,6 @@
-# Hierarchical Inducing Point Gaussian Process for Inter-domainObservations
+# Hierarchical Inducing Point Gaussian Process for Inter-domain Observations
 
-This repo contains the codes for the AISTATS 2021 paper [Hierarchical Inducing Point Gaussian Process for Inter-domainObservations](https://arxiv.org/pdf/2103.00393.pdf).
+This repo contains the codes for the AISTATS 2021 paper [Hierarchical Inducing Point Gaussian Process for Inter-domain Observations](https://arxiv.org/pdf/2103.00393.pdf).
 
 
 
