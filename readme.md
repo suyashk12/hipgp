@@ -93,7 +93,11 @@ An example command to run the experiment
 
 `python run_domain_experiment.py --nobs=1000 --ntest=1000 --nx=10 --nz=5 --mf-model --fit-models --lr=1e-6 --epochs=2` 
 
-The whole domain simulation dataset comes from [1][1], [2][2], [3][3].  
+The whole domain simulation dataset comes from the following sources:
+
+https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W/abstract
+https://ui.adsabs.harvard.edu/abs/2018MNRAS.480..800H/abstract
+https://ui.adsabs.harvard.edu/abs/2020ApJS..246....6S/abstract
 
 __6. Empirical analysis on preconditioner (Appendix C.1)__
 
@@ -108,10 +112,4 @@ An example command to run the experiment
 `python run_3droad_experiment.py --nobs=1000 --ntest=1000 --num-inducing-x=20 --num-inducing-y=20 --mf-model --fit-models --lr=1e-6 --epochs=2` 
 
 
-
-
-
-[1]: https://ui.adsabs.harvard.edu/abs/2016ApJ...827L..23W/abstract
-[2]: https://ui.adsabs.harvard.edu/abs/2018MNRAS.480..800H/abstract
-[3]:  https://ui.adsabs.harvard.edu/abs/2020ApJS..246....6S/abstract
 
