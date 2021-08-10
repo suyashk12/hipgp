@@ -9,16 +9,35 @@ import json
 import torch
 import warnings
 
-from ziggy.misc import experiment_util_domain as eud
-from ziggy.misc import experiment_util as eu
+import sys
+script_dir = "../build/lib/ziggy/misc"
+
+# Add the absolute directory  path containing your
+# module to the Python path
+
+sys.path.append(os.path.abspath(script_dir))
+
+import experiment_util_domain as eud
+import experiment_util as eu
+
+#from ziggy.misc import experiment_util_domain as eud
+#from ziggy.misc import experiment_util as eu
+
 from ziggy.misc.util import add_date_time
 from ziggy.misc.util import NumpyEncoder
 
+import importlib
+
+import exp_utils
+importlib.reload(exp_utils)
 from exp_utils import domain_epoch_callback, plot_domain_true
 
+importlib.reload(eud)
+importlib.reload(eu)
 
 parser = argparse.ArgumentParser(description='Synthetic Experiment')
 parser.add_argument('--exp-name', default='null', type=str)
+parser.add_argument('--dataset', default='small-sim', type=str)
 
 parser.add_argument("--fit-models", action="store_true")
 parser.add_argument("--whitened-type", default='ziggy', type=str, help='type of whitened approach, '
@@ -31,7 +50,7 @@ parser.add_argument("--svgp", action="store_true")
 parser.add_argument("--batch-solve", action='store_true')
 
 # kernel learning
-parser.add_argument("--learn-kernel", action="store_true", help='currently, only capatible with cholesky whitening')
+parser.add_argument("--learn-kernel", action="store_true", help='currently, only capatible with cholesky whitening', default=False)
 parser.add_argument("--kernel-lr", default=1e-3, type=float)
 
 # current not learning observation noise
@@ -42,7 +61,7 @@ parser.add_argument("--kernel-lr", default=1e-3, type=float)
 parser.add_argument("--batch-size", default=200, type=int, help="batch size in natural gradient descent")
 parser.add_argument("--epochs", default=10, type=int, help="number of epochs to run natural gradient descent")
 parser.add_argument("--lr", default=1e-2, type=float, help='learning rate for natural gradient descent')
-parser.add_argument("--schedule-lr", action="store_true")
+parser.add_argument("--schedule-lr", action="store_true", default=True)
 parser.add_argument("--step_decay", default=0.99, help="used when schedule-lr")
 parser.add_argument("--print-debug-info", action="store_true")
 parser.add_argument("--epoch-log-interval", default=1, type=int)
@@ -50,7 +69,6 @@ parser.add_argument("--batch-log-interval", default=1, type=int)  # print every 
 
 # batch-solve-parameters, used whn batch-solve
 parser.add_argument("--batch-solve-bsz", default=-1, type=int)
-
 
 # cuda
 parser.add_argument("--cuda-num", default=0, type=int)
@@ -62,6 +80,7 @@ parser.add_argument("--sig2-init",    default=0.1, type=float)  # 1e-4
 parser.add_argument("--ell-min", default=0.1, type=float)
 parser.add_argument("--ell-max", default=0.1, type=float)
 parser.add_argument("--ell-nsteps", default=1, type=int)
+parser.add_argument("--init-svar", default=0.1, type=float)
 
 # data
 parser.add_argument("--model_name", default='m12m_lsr0',
@@ -79,6 +98,7 @@ parser.add_argument("--nobs", default=10000,
                     help="number of observations", type=int)
 parser.add_argument("--ntest", default=1000,
                     help="number of test samples", type=int)
+parser.add_argument("--small-box", default = True, help="grid size", type=bool)
 
 # model structure
 parser.add_argument("--num-inducing-x", default=15,
@@ -94,7 +114,6 @@ parser.add_argument('--predict-maxiter-cg',   default=50, type=int)
 parser.add_argument('--eval-train', action="store_true")
 parser.add_argument("--only-eval-last-epoch", action="store_true")
 
-
 args, _ = parser.parse_known_args()
 print("Experiment script args: ", args)
 
@@ -109,11 +128,6 @@ model_param_name = 'kern={kern}-l={ell:.2f}-{ellmax:.2f}-M={indx}-{indz}-maxiter
     lr=args.lr)
 
 print("Model directory name: ", model_param_name)
-
-
-import matplotlib.pyplot as plt; plt.ion()
-import seaborn as sns; sns.set_style("white")
-sns.set_context("paper")
 
 #####################
 # start script      #
@@ -143,7 +157,13 @@ if args.data_dir is None:
     import git
     repo = git.Repo('.', search_parent_directories=True)
     repo_dir = repo.working_tree_dir  # hipgp
-    args.data_dir = os.path.join(repo_dir, 'experiments-hip-gp', 'domain-data', 'domain_subsample.dat')
+    
+    if(args.dataset == 'small-sim'):
+        args.data_dir = os.path.join(repo_dir, 'experiments-hip-gp', 'domain-data', 'domain_subsample.dat')
+    elif(args.dataset == 'big-sim'):
+        args.data_dir = os.path.join(repo_dir, 'experiments-hip-gp', 'actual-data', 'actual_sample.dat')
+    elif(args.dataset == 'gaia'):
+        args.data_dir = os.path.join(repo_dir, 'experiments-hip-gp', 'observed-data', 'gaia_sample.dat')
 
 Data_kwargs = {
     'data_dir': args.data_dir,
@@ -153,13 +173,16 @@ Data_kwargs = {
     'xhi'   : args.xhi,
     'zlo'   : args.zlo,
     'zhi'   : args.zhi,
+    'small_box' : args.small_box,
     'seed'  : 42,
     'noise_std': 0.005,
-    'noise_mean': 0.005
+    'noise_mean': 0.005,
+    'num_inducing_x': args.num_inducing_x,
+    'num_inducing_z': args.num_inducing_z,
+    'dataset': args.dataset
     }
 
-
-data_dict = eud.make_domain_data(**Data_kwargs)
+data_dict, xinduce_grids = eud.make_domain_data(**Data_kwargs)
 print("Nobs = {}, Ntest = {}".format(data_dict['xobs'].shape[0], data_dict['xtest'].shape[0]))
 
 xlo, xhi = data_dict['xlo'], data_dict['xhi']
@@ -174,19 +197,57 @@ print(" ---------- synthetic experiment --------- ")
 for k, v in Data_kwargs.items():
     print("{0:10} : ".format(k), v)
 
+#plot_domain_true(data_dict, output_dir)
 
-plot_domain_true(data_dict, output_dir, alpha_value=1.0)
+from ziggy import svgp, kernels, viz
+import matplotlib.pyplot as plt
+import seaborn as sns; sns.set_style("white")
+sns.set_context("paper")
 
+xx1, xx2, xx3 = data_dict['xx1'], data_dict['xx2'], data_dict['xx3']
+fgrid = data_dict['fgrid']
+vmin, vmax = data_dict['vmin'], data_dict['vmax']
+
+if(args.dataset != 'gaia'):
+
+    for i in range(xx3.shape[-1]):
+
+        z = np.unique(xx3[:,:,i])[0]
+        sns.set(font_scale = 1.2, style='white')
+        (xlo, xhi) = xx1.min(), xx1.max()
+        (ylo, yhi) = xx2.min(), xx2.max()
+
+        # plot the true grid as well                                                                                                                                                           
+        fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+
+        try:
+            cm = viz.plot_smooth(ax, fgrid.reshape(xx1.shape)[:,:,i].value,
+                                 xlim=(xlo, xhi), ylim=(xlo, xhi),
+                                 vmin=vmin, vmax=vmax)
+        except AttributeError:
+            cm = viz.plot_smooth(ax, fgrid.reshape(xx1.shape)[:,:,i],
+                                 xlim=(xlo, xhi), ylim=(xlo, xhi),
+                                 vmin=vmin, vmax=vmax)
+        ax.set_xlim(xlo, xhi)
+        ax.set_ylim(ylo, yhi)
+        fig.savefig(os.path.join(output_dir, "true-fgrid-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
 
 #################
 # Fit Models    #
 #################
+
+#################
+# Fit Models    #
+#################
+
 if args.fit_models:
     # unpack data
     xobs, yobs, sobs = \
         data_dict['xobs'], data_dict['aobs'], data_dict['sobs']
     xtest, etest, ftest = \
         data_dict['xtest'], data_dict['etest'], data_dict['ftest']  # ftest is None
+    
+    
     xlo, xhi = data_dict['xlo'], data_dict['xhi']
 
     fit_kwargs = {'kernel': args.kernel,
@@ -217,7 +278,7 @@ if args.fit_models:
                   'batch_solve_bsz': args.batch_solve_bsz,
 
                   'integrated_obs': True,  # whether to integrate obs in training
-                  'do_integrated_predictions': True,
+                  'do_integrated_predictions': False,
 
                   'num_inducing_x': args.num_inducing_x,
                   'num_inducing_z': args.num_inducing_z,
@@ -252,7 +313,12 @@ if args.fit_models:
 
 
     # set up args for data
-    data_kwargs = {'xobs': xobs[:, :],
+    data_kwargs = {#'xx1': xx1,
+                   #'xx2': xx2,
+                   #'xx3': xx3,
+                   #'vmin': vmin,
+                   #'vmax': vmax,
+                   'xobs': xobs[:, :],
                    'yobs': yobs[:, None],
                    'sobs': sobs[:, None],
                    'xinduce_grids': xinduce_grids,
@@ -260,7 +326,8 @@ if args.fit_models:
                    'etest': etest,
                    'ftest': ftest,
                    'xgrid': data_dict['xgrid'],
-                   'init_Svar': .1}
+                   'fgrid': data_dict['fgrid'],
+                   'init_Svar': args.init_svar}
 
     xtest = data_dict['xtest']
     xgrid = data_dict['xgrid']
@@ -320,8 +387,48 @@ if args.fit_models:
         # df.to_csv(os.path.join(output_dir, "errordf.csv"))
         dfsum.to_csv(os.path.join(output_dir, "errordf-summary.csv"))
 
+import matplotlib.pyplot as plt
+import numpy as np
 
+model = full_model_names[args.epochs-1]
+elbo = torch.load(model + "/elbo_trace.pkl")
+iterations = np.arange(1, len(elbo)+1)
 
+fig = plt.figure(figsize = (6, 4))
+ax = plt.axes()
+ax.plot(iterations, np.array(elbo), color = 'blue')
+ax.set_xlabel('Iteration')
+ax.set_ylabel('ELBO')
+#ax.set_aspect('equal')
+plt.tight_layout() 
+plt.savefig(output_dir + "/elbo.pdf")    
 
+try:
+    sig2 = np.array(torch.load(model + "/sig2_trace.pkl"))
 
+    fig = plt.figure(figsize = (6, 4))
+    ax = plt.axes()
+    ax.plot(iterations, np.array(sig2), color = 'blue')
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel(r'$\sigma^2$')
+    #ax.set_aspect('equal')
+    plt.tight_layout() 
+    plt.savefig(output_dir + "/sig2.pdf")  
 
+except:
+    pass
+
+try:
+    ell = np.array(torch.load(model + "/ell_trace.pkl"))
+
+    fig = plt.figure(figsize = (6, 4))
+    ax = plt.axes()
+    ax.plot(iterations, np.array(ell), color = 'blue')
+    ax.set_xlabel('Iteration')
+    ax.set_ylabel(r'$l$')
+    #ax.set_aspect('equal')
+    plt.tight_layout() 
+    plt.savefig(output_dir + "/ell.pdf")  
+
+except:
+    pass
