@@ -1,10 +1,21 @@
 import numpy as np
-import matplotlib.pyplot as plt
+
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt; plt.ion()
 from mpl_toolkits.mplot3d import Axes3D
 import os
 from ziggy import viz
-from ziggy.misc.experiment_util import standard_epoch_callback, plot_posterior_grid
 
+import os
+import sys
+script_dir = "../build/lib/ziggy/misc"
+sys.path.append(os.path.abspath(script_dir))
+import experiment_util as eu
+from experiment_util import standard_epoch_callback, plot_posterior_grid
+
+import seaborn as sns; sns.set_style("white")
+sns.set_context("paper")
 
 def turn_off_ticks(ax):
     ax.xaxis.set_ticklabels([])
@@ -57,82 +68,301 @@ def domain_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest, 
                                                       return_pdict=True)
 
     plot_domain_rslt(epoch_odir, pdict)
+    
     return eval_time_tuples
 
 
 def plot_domain_rslt(odir, pdict):
+
+    sns.set(font_scale = 1, style='whitegrid')
+
     # load_dict
     xtest = pdict['xtest']
-    ftest, fmu_test, fsig_test = pdict['ftest'], pdict['fmu_test'], pdict['fsig_test']
-    etest, emu_test, esig_test = pdict['etest'], pdict['emu_test'], pdict['esig_test']
-    fres_test = fmu_test - ftest
-    eres_test = emu_test - etest
 
-    ########################
-    #   Prediction on f    #
-    ########################
+    # determining a "good" slice
+    mean_z = 0
+    diff_z = 0.05
 
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=fmu_test, s=20)
-    turn_off_ticks(ax)
-    fig.colorbar(im)
-    plt.title("emu-test")
-    fig.savefig(os.path.join(odir, "predict-fmu-test-3D.png"))
+    inds = []
+
+    for i in range(0, len(pdict['xtest'])):
+        if(pdict['xtest'][i][2] >= mean_z - diff_z and pdict['xtest'][i][2] <= mean_z + diff_z):
+            inds.append(i)
+
+    # determining quantities from that slice
+    xtest_slice = pdict['xtest'][inds]
+
+    try:
+        etest = pdict['etest']
+        emu_test = pdict['emu_test']
+        esig_test = pdict['esig_test']
+
+        eres_test = emu_test - etest
+        erel_test = eres_test/etest
+        ez_test = -eres_test/esig_test
+
+        # integrated
+
+        # posterior mean
+
+        # integrated
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca(projection='3d')
+        im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=emu_test, s=20)
+        cbar = fig.colorbar(im, location = "left")
+        cbar.set_label(r'Posterior mean of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_zlabel(r'$z$ (kpc)')
+        ax.set_box_aspect([1,1,1])
+        plt.savefig(os.path.join(odir, "predict-emu-test-3D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # error
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca(projection='3d')
+        im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=esig_test, s=20)
+        cbar = fig.colorbar(im, location = "left")
+        cbar.set_label(r'Posterior error in $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_zlabel(r'$z$ (kpc)')
+        ax.set_box_aspect([1,1,1])
+        plt.savefig(os.path.join(odir, "predict-esig-test-3D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # residual
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca(projection='3d')
+        im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=eres_test, s=20)
+        cbar = fig.colorbar(im, location = "left")
+        cbar.set_label(r'Residual of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_zlabel(r'$z$ (kpc)')
+        ax.set_box_aspect([1,1,1])
+        plt.savefig(os.path.join(odir, "predict-eres-test-3D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # relative error
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca(projection='3d')
+        im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=erel_test, s=20)
+        cbar = fig.colorbar(im, location = "left")
+        cbar.set_label(r'Relative error in $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_zlabel(r'$z$ (kpc)')
+        ax.set_box_aspect([1,1,1])
+        plt.savefig(os.path.join(odir, "predict-erel-test-3D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # z-score
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca(projection='3d')
+        im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=ez_test, s=20)
+        cbar = fig.colorbar(im, location = "left")
+        cbar.set_label(r'Z-score of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_zlabel(r'$z$ (kpc)')
+        ax.set_box_aspect([1,1,1])
+        plt.savefig(os.path.join(odir, "predict-ez-test-3D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        etest_slice = pdict['etest'][inds]
+        emu_test_slice = pdict['emu_test'][inds]
+        esig_test_slice = pdict["esig_test"][inds]
+        eres_test_slice = emu_test_slice - etest_slice
+        erel_test_slice = eres_test_slice/etest_slice
+        ez_test_slice = -eres_test_slice/esig_test_slice
+
+        # integrated
+
+        # prediction
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca()
+        im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = emu_test_slice)
+        cbar = fig.colorbar(im)
+        cbar.set_label(r'Posterior mean of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(os.path.join(odir, "predict-emu-test-2D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # error
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca()
+        im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = esig_test_slice)
+        cbar = fig.colorbar(im)
+        cbar.set_label(r'Posterior error in $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(os.path.join(odir, "predict-esig-test-2D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # residual
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca()
+        im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = eres_test_slice)
+        cbar = fig.colorbar(im)
+        cbar.set_label(r'Residual of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(os.path.join(odir, "predict-eres-test-2D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # relative error
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca()
+        im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = erel_test_slice)
+        cbar = fig.colorbar(im)
+        cbar.set_label(r'Relative error in $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(os.path.join(odir, "predict-erel-test-2D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+        # z-score
+
+        fig = plt.figure(figsize = (6, 6))
+        ax = plt.gca()
+        im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = ez_test_slice)
+        cbar = fig.colorbar(im)
+        cbar.set_label(r'Z-score of $e$')
+        ax.set_xlabel(r'$x$ (kpc)')
+        ax.set_ylabel(r'$y$ (kpc)')
+        ax.set_aspect('equal')
+        plt.tight_layout()
+        plt.savefig(os.path.join(odir, "predict-ez-test-2D.pdf"), dpi = 300, transparent = True)
+        plt.close()
+
+    except:
+        pass
+
+def plot_domain_true(data_dict, output_dir):
+
+    sns.set(font_scale = 1, style='whitegrid')
+
+    xlo = data_dict['xlo']
+    xhi = data_dict['xhi']
+    zlo = data_dict['zlo']
+    zhi = data_dict['zhi']
+
+    # plot training set
+    fig = plt.figure(figsize = (8, 6))
+    ax = plt.gca(projection='3d')
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(xlo, xhi)
+    ax.set_zlim(zlo, zhi)
+    im = ax.scatter(data_dict['xobs'][:, 0], data_dict['xobs'][:, 1], data_dict['xobs'][:, 2], c=data_dict['eobs'], s=20)
+    cbar = fig.colorbar(im, location='left')
+    cbar.set_label(r'Train $e$')
+    ax.set_xlabel(r'$x$ (kpc)')
+    ax.set_ylabel(r'$y$ (kpc)')
+    ax.set_zlabel(r'$z$ (kpc)')
+    ax.set_box_aspect([2,2,1])
+    plt.savefig(os.path.join(output_dir, "true-eobs-3D.pdf"), dpi = 300, transparent = True)
     plt.close()
 
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=fsig_test, s=20)
-    fig.colorbar(im)
-    plt.title("esig-test")
-    fig.savefig(os.path.join(odir, "predict-fsig-test-3D.png"))
+    # 3D plots
+    
+    # integrated
+    fig = plt.figure(figsize = (8, 6))
+    ax = plt.gca(projection='3d')
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(xlo, xhi)
+    ax.set_zlim(zlo, zhi)
+    im = ax.scatter(data_dict['xtest'][:, 0], data_dict['xtest'][:, 1], data_dict['xtest'][:, 2], c=data_dict['etest'], s=20)
+    cbar = fig.colorbar(im, location='left')
+    cbar.set_label(r'Test $e$')
+    ax.set_xlabel(r'$x$ (kpc)')
+    ax.set_ylabel(r'$y$ (kpc)')
+    ax.set_zlabel(r'$z$ (kpc)')
+    ax.set_box_aspect([2,2,1])
+    plt.savefig(os.path.join(output_dir, "true-etest-3D.pdf"), dpi = 300, transparent = True)
     plt.close()
 
-    ####################
-    #  Prediction on e #
-    ####################
-    # 3d plot
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=emu_test, s=20)
-    turn_off_ticks(ax)
-    fig.colorbar(im)
-    plt.title("emu-test")
-    fig.savefig(os.path.join(odir, "predict-emu-test-3D.png"))
+    # 2D plots
+
+    # training set
+
+    # determining a "good" slice
+    mean_obs_z = 0
+    diff_obs_z = 0.05
+
+    inds = []
+
+    for i in range(0, len(data_dict['xtest'])):
+        if(data_dict['xobs'][i][2] >= mean_obs_z - diff_obs_z and data_dict['xobs'][i][2] <= mean_obs_z + diff_obs_z):
+            inds.append(i)
+
+    # determining quantities from that slice
+    xtest_slice = data_dict['xobs'][inds]
+    etest_slice = data_dict['eobs'][inds]
+
+    # integrated
+    fig = plt.figure(figsize = (6, 6))
+    ax = plt.gca()
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(xlo, xhi)
+    im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = etest_slice)
+    cbar = fig.colorbar(im)
+    cbar.set_label(r'Train $e$')
+    ax.set_xlabel(r'$x$ (kpc)')
+    ax.set_ylabel(r'$y$ (kpc)')
+    ax.set_aspect('equal')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "true-eobs-2D.pdf"), dpi = 300, transparent = True)
     plt.close()
 
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=esig_test, s=20)
-    fig.colorbar(im)
-    plt.title("esig-test")
-    fig.savefig(os.path.join(odir, "predict-esig-test-3D.png"))
+    # determining a "good" slice
+    mean_test_z = 0
+    diff_test_z = 0.05
+
+    inds = []
+
+    for i in range(0, len(data_dict['xtest'])):
+        if(data_dict['xtest'][i][2] >= mean_test_z - diff_test_z and data_dict['xtest'][i][2] <= mean_test_z + diff_test_z):
+            inds.append(i)
+
+    # testing set
+
+    # determining quantities from that slice
+    xtest_slice = data_dict['xtest'][inds]
+    etest_slice = data_dict['etest'][inds]
+
+    # integrated
+    fig = plt.figure(figsize = (6, 6))
+    ax = plt.gca()
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(xlo, xhi)
+    im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = etest_slice)
+    cbar = fig.colorbar(im)
+    cbar.set_label(r'Test $e$')
+    ax.set_xlabel(r'$x$ (kpc)')
+    ax.set_ylabel(r'$y$ (kpc)')
+    ax.set_aspect('equal')
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "true-etest-2D.pdf"), dpi = 300, transparent = True)
     plt.close()
-
-def plot_domain_true(data_dict, output_dir, alpha_value=0.3):
-
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    turn_off_ticks(ax)
-    im = ax.scatter(data_dict['xtest'][:, 0], data_dict['xtest'][:, 1], data_dict['xtest'][:, 2], c=data_dict['etest'],
-                    s=20, alpha=alpha_value)
-    fig.colorbar(im)
-    plt.title("true etest")
-    fig.savefig(os.path.join(output_dir, "true-etest-3D.png"))
-    plt.close()
-
-    # plot process data
-    fig = plt.figure(figsize=(8, 4))
-    ax = Axes3D(fig)
-    turn_off_ticks(ax)
-    im = ax.scatter(data_dict['xtest'][:, 0], data_dict['xtest'][:, 1], data_dict['xtest'][:, 2], c=data_dict['ftest'],
-                    s=20, alpha=alpha_value)
-    fig.colorbar(im)
-    plt.title("true ftest")
-    fig.savefig(os.path.join(output_dir, "true-ftest-3D.png"))
-    plt.close()
-
 
 def synthetic_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest, ftest, etest, xgrid, fgrid, egrid,
                             cuda_num, predict_maxiter_cg,
@@ -202,4 +432,3 @@ def load_uci_data(data_dir, dataset, nobs, nvalid, ntest, eval_valid, eval_grid,
     }
 
     return ddict
-
