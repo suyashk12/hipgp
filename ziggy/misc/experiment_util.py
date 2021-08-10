@@ -14,7 +14,7 @@ def svigp_fit_predict_and_save(
     name,
     xobs, yobs, sobs,
     xinduce_grids,
-    model_class = "SVGP",
+    model_class="SVGP",
     init_Svar=1.,
     xtest=None, etest=None, ftest=None,
     xvalid=None, evalid=None, fvalid=None,
@@ -51,6 +51,7 @@ def svigp_fit_predict_and_save(
     Saves extinction predictions, pointwise predictions, and a 
     grid of predictions to the directory `<output_dir>/<name>`
     """
+
     print(json.dumps(fit_kwargs))
     # require 2-dim inputs
     assert len(xobs.shape) == len(yobs.shape)
@@ -460,65 +461,172 @@ def make_error_plots(output_dir, model_names, pretty_names=None):
         fig.savefig(os.path.join(output_dir, "test-error-%s.pdf"%etype), bbox_inches='tight')
         plt.close("all")
 
-
-def plot_posterior_grid(pdict, output_dir, ticklabels=True):
-    """ Visualize posteiror grid slice
+def plot_posterior_grid(name, pretty_name=None,
+                        xx1=None, xx2=None, xx3=None, vmin=None, vmax=None):
+    """ Visualize posteiror grid slices                                                                                                                                                        
     """
     from ziggy import viz
+    # model name is model directory                                                                                                                                                            
+    odir = name #os.path.join(output_dir, name)                                                                                                                                                
+    if pretty_name is None:
+        pretty_name = os.path.split(odir)[-1]
 
-    xlo, xhi = pdict['xgrid'][:, 0].min(), pdict['xgrid'][:, 0].max()
-    ylo, yhi = pdict['xgrid'][:, 1].min(), pdict['xgrid'][:, 1].max()
-    nx, ny = pdict['fgrid'].shape
-    vmin, vmax = pdict['fgrid'].min(), pdict['fgrid'].max()
+    from scipy.stats import norm
 
-    # plot posterior mean on xgrid
-    sns.set(font_scale = 1.2, style='white')
+    # error DF for dists                                                                                                                                                                       
+    df = make_error_dataframe([name], [pretty_name])                                                                                                                                    
+    pdict = torch.load(os.path.join(odir, "predictions.pkl"))
+    mdict = torch.load(os.path.join(odir, "model.pkl"))
 
-    pkwargs = {'xlim': (xlo, xhi),
-               'ylim': (ylo, yhi),
-               'ticklabels': ticklabels}
+    print("Kernel params! ", torch.exp(mdict['global_theta1']))
 
-    fig, ax = plt.figure(figsize=(6,6)), plt.gca()
-    cm = viz.plot_smooth(ax, pdict['fmu_grid'].reshape(nx, ny),
-                         vmin=vmin, vmax=vmax, **pkwargs)
-    ax.set_xlim(xlo, xhi)
-    ax.set_ylim(ylo, yhi)
-    fig.savefig(os.path.join(output_dir, "posterior-fmu.pdf"), bbox_inches='tight')
-    plt.close()
+    for i in range(xx3.shape[-1]):
+        z = np.unique(xx3[:,:,i])[0]
+        # plot posterior mean on xgrid                                                                                                                                                         
+        sns.set(font_scale = 1.2, style='white')
+        (xlo, xhi) = xx1.min(), xx1.max()
+        (ylo, yhi) = xx2.min(), xx2.max()
+        fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+        cm = viz.plot_smooth(ax, pdict['fmu_grid'].reshape(xx1.shape)[:,:,i],
+                             xlim=(xlo, xhi), ylim=(xlo, xhi),
+                             vmin=vmin, vmax=vmax)
+        ax.set_xlim(xlo, xhi)
+        ax.set_ylim(ylo, yhi)
+        #ax.set_title('.'.join(name.split('-')[7:-3]))
+        fig.savefig(os.path.join(odir, "posterior-fmu-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
 
-    fig, ax = plt.figure(figsize=(6,6)), plt.gca()
-    cm = viz.plot_smooth(ax, 2*pdict['fsig_grid'].reshape(nx, ny),
-                         vmin=0., **pkwargs)
-    ax.set_xlim(xlo, xhi)
-    ax.set_ylim(ylo, yhi)
-    fig.savefig(os.path.join(output_dir, "posterior-fsig.pdf"), bbox_inches='tight')
-    plt.close()
+        fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+        cm = viz.plot_smooth(ax, 2*pdict['fsig_grid'].reshape(xx1.shape)[:,:,i],
+                             xlim=(xlo, xhi), ylim=(xlo, xhi),
+                             vmin=0.)
+        ax.set_xlim(xlo, xhi)
+        ax.set_ylim(ylo, yhi)
+        #ax.set_title('.'.join(name.split('-')[7:-3]))
+        fig.savefig(os.path.join(odir, "posterior-fsig-z{0:.2f}.pdf".format(z)), bbox_inches='tight')
 
-    # plot the true grid as well
-    fig, ax = plt.figure(figsize=(6,6)), plt.gca()
-    cm = viz.plot_smooth(ax, pdict['fgrid'],
-                         vmin=vmin, vmax=vmax, **pkwargs)
-    ax.set_xlim(xlo, xhi)
-    ax.set_ylim(ylo, yhi)
-    fig.savefig(os.path.join(output_dir, "true-fgrid.pdf"), bbox_inches='tight')
-    plt.close()
+        # plot residual and zscore                                                                                                                                                             
+        
+        try:
+            fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+            resid = np.array(pdict['fgrid'].squeeze().value) - pdict['fmu_grid'].squeeze().reshape(xx1.shape)
+            cm = viz.plot_smooth(ax, resid[:,:,i],
+                                xlim=(xlo, xhi), ylim=(xlo, xhi))
+            ax.set_xlim(xlo, xhi)
+            ax.set_ylim(ylo, yhi)
+            #ax.set_title('.'.join(name.split('-')[7:-3]))
+            fig.savefig(os.path.join(odir, "residual-fgrid-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
+        except:
+            try:
+                fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+                resid = np.array(pdict['fgrid'].squeeze()) - pdict['fmu_grid'].squeeze().reshape(xx1.shape)
+                cm = viz.plot_smooth(ax, resid[:,:,i],
+                                    xlim=(xlo, xhi), ylim=(xlo, xhi))
+                ax.set_xlim(xlo, xhi)
+                ax.set_ylim(ylo, yhi)
+                #ax.set_title('.'.join(name.split('-')[7:-3]))
+                fig.savefig(os.path.join(odir, "residual-fgrid-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
+            except:
+                pass
 
-    # plot residual and zscore
-    fig, ax = plt.figure(figsize=(6,6)), plt.gca()
-    resid = pdict['fgrid'] - pdict['fmu_grid'].reshape(nx, ny)
-    cm = viz.plot_smooth(ax, resid, **pkwargs)
-    ax.set_xlim(xlo, xhi)
-    ax.set_ylim(ylo, yhi)
-    fig.savefig(os.path.join(output_dir, "residual-fgrid.pdf"), bbox_inches='tight')
-    plt.close()
+        
+        try:
+            fig, ax = plt.figure(figsize=(6,6)), plt.gca()
+            zs = resid / pdict['fsig_grid'].squeeze().reshape(xx1.shape)
+            cm = viz.plot_smooth(ax, zs[:,:,i],
+                                xlim=(xlo, xhi), ylim=(xlo, xhi))
+            ax.set_xlim(xlo, xhi)
+            ax.set_ylim(ylo, yhi)
+            #ax.set_title('.'.join(name.split('-')[7:-3]))
+            fig.savefig(os.path.join(odir, "zscore-fgrid-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
+        except:
+            pass
 
-    fig, ax = plt.figure(figsize=(6,6)), plt.gca()
-    zs = resid / pdict['fsig_grid'].reshape(nx, ny)
-    cm = viz.plot_smooth(ax, zs.reshape(nx, ny), **pkwargs)
-    ax.set_xlim(xlo, xhi)
-    ax.set_ylim(ylo, yhi)
-    fig.savefig(os.path.join(output_dir, "zscore-fgrid.pdf"), bbox_inches='tight')
-    plt.close()
+        try:
+            fig, ax = plt.figure(figsize=(6,4)), plt.gca()
+            resid = np.array(pdict['fgrid'].flatten()) - pdict['fmu_grid'] 
+            ax.hist(resid / pdict['fsig_grid'].squeeze(), bins=30, density=True, alpha=.5,
+                    label=pretty_name)
+            from scipy.stats import norm
+            xlim = ax.get_xlim()
+            xlim = -3, 3
+            xgrid = np.linspace(xlim[0], xlim[-1], 100)
+            ax.plot(xgrid, norm.pdf(xgrid), label="$\mathcal{N}(0,1)$")
+            
+            ax.set_xlabel("z score", fontsize=12)
+            ax.set_ylabel("density", fontsize=12)
+            ax.legend(fontsize=12, frameon=True, loc='upper left')
+            ax.set_xlim(xlim)
+            fig.savefig(os.path.join(odir, "f-zscore-histogram.pdf"),
+                        bbox_inches='tight')
+        except:
+            pass
+
+    try:
+        colname = "e zscore"
+        xlim = -3, 3
+        xgrid = np.linspace(xlim[0], xlim[-1], 100)
+
+        fig, ax = plt.figure(figsize=(6,4)), plt.gca()
+
+        nz = pd.isnull(df[colname])
+
+        ax.hist(df[colname][~nz].values.squeeze(), bins=30, density=True, alpha=.5) #label=pretty_name)
+        ax.plot(xgrid, norm.pdf(xgrid), label="$\mathcal{N}(0,1)$")
+        ax.set_xlabel("e z-score", fontsize=12)
+        ax.set_ylabel("density", fontsize=12)
+        ax.legend(fontsize=12, frameon=True, loc='upper left')
+        ax.set_xlim(xlim)
+        fig.savefig(os.path.join(odir, "e-zscore-histogram.pdf"),
+                    bbox_inches='tight')
+    except:
+        pass
+    
+    plt.close("all")
+
+    try:
+
+        fig, axes = plt.subplots(2,2, figsize=(10, 8))
+
+        i = np.where(xx3[0,0,:] == 0)[0][0]
+
+        #print(xx3[0,0,:], i)
+        
+        cm = viz.plot_smooth(axes[0,0], pdict['fmu_grid'].reshape(xx1.shape)[:,:,i],
+                            xlim=(xlo, xhi), ylim=(xlo, xhi),
+                            vmin=vmin, vmax=vmax)
+
+        cm = viz.plot_smooth(axes[0,1], 2*pdict['fsig_grid'].reshape(xx1.shape)[:,:,i],
+                            xlim=(xlo, xhi), ylim=(xlo, xhi),
+                            vmin=0.)
+        for ax in [axes[0,0], axes[0,1]]:
+            ax.set_xlim(xlo, xhi)
+            ax.set_ylim(ylo, yhi)
+
+        axes[1,0].hist(resid / pdict['fsig_grid'].squeeze(), bins=30, density=True, alpha=.5) #label=pretty_name)
+        axes[1,0].plot(xgrid, norm.pdf(xgrid), label="$\mathcal{N}(0,1)$")
+        
+        axes[1,0].set_xlabel("f z-score", fontsize=12)
+        axes[1,0].set_ylabel("density", fontsize=12)
+        axes[1,0].legend(fontsize=12, frameon=True, loc='upper left')
+        axes[1,0].set_xlim(xlim)
+    
+        colname = "e zscore"
+        nz = pd.isnull(df[colname])
+
+        axes[1,1].hist(df[colname][~nz].values, bins=30, density=True, alpha=.5) #label=pretty_name)
+        axes[1,1].plot(xgrid, norm.pdf(xgrid), label="$\mathcal{N}(0,1)$")
+        axes[1,1].set_xlabel("e z-score", fontsize=12)
+        axes[1,1].set_ylabel("density", fontsize=12)
+        axes[1,1].legend(fontsize=12, frameon=True, loc='upper left')
+        axes[1,1].set_xlim(xlim)
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.suptitle('.'.join(name.split('-')[7:-3]))
+        fig.savefig(os.path.join(odir, "quad.pdf".format(z))) #, bbox_inches='tight')
+
+    except:
+        pass
+
+    plt.close("all")
 
 
 def make_model_distance_plots(model_name, pretty_name=None):
@@ -638,6 +746,7 @@ def standard_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest
                             elbo_trace, save_model=True, save_trace=True, elbo=None,
                             sig2_list=None, ell_list=None, noisesq_list=None, return_pdict=False,
                             xvalid=None, fvalid=None, evalid=None):
+
     ftest_eval_time = fgrid_eval_time = etest_eval_time = egrid_eval_time = fvalid_eval_time = evalid_eval_time = None
 
     eval_valid = True if xvalid is not None else False
@@ -768,6 +877,7 @@ def standard_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest
         print("Predictions on grid set takes {:.4f}".format(fgrid_eval_time))
         pdict['fmu_grid'] = fmu.detach().numpy().squeeze()
         pdict['fsig_grid'] = fsig.detach().numpy().squeeze()
+        #print(fgrid != None)
         pdict['fgrid'] = fgrid
         pdict['xgrid'] = xgrid
 
@@ -791,6 +901,31 @@ def standard_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest
         print("saving to ", epoch_odir)
         torch.save(pdict, os.path.join(epoch_odir, "predictions.pkl"))
 
+    ##########################
+    # Plot posterior grid #
+    ##########################
+
+    z_s = [item[2] for item in xgrid]
+    nz = len(np.unique(z_s))
+
+    nx = int(np.sqrt(xgrid.shape[0]/nz))
+    ny = nx
+
+    xx1_flat = [xgrid[i][0] for i in range(0, xgrid.shape[0])]
+    xx2_flat = [xgrid[i][1] for i in range(0, xgrid.shape[0])]
+    xx3_flat = [xgrid[i][2] for i in range(0, xgrid.shape[0])]
+
+    xlo, xhi = np.min(xx1_flat), np.max(xx1_flat)
+    ylo, yhi = np.min(xx2_flat), np.max(xx2_flat)
+    zlo, zhi = np.min(xx3_flat), np.max(xx3_flat)
+
+    x1_grid = torch.linspace(xlo, xhi, nx)
+    x2_grid = torch.linspace(ylo, yhi, ny)
+    x3_grid = torch.linspace(zlo, zhi, nz)
+
+    xx1, xx2, xx3 = np.meshgrid(x1_grid, x2_grid, x3_grid)
+
+    plot_posterior_grid(epoch_odir, None, xx1, xx2, xx3)
 
     ##########################
     # Report error reduction #
@@ -819,7 +954,7 @@ def standard_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest
             covdf = make_coverage_table([epoch_odir], target='fe')
         else:
             covdf = make_coverage_table([epoch_odir], target='f')
-    print("\nNoise Reduction DataFrame")
+    print("\nNoise Reduction DataFramez")
     print(noise_df)
 
     print("\ncoverage table")
@@ -832,5 +967,6 @@ def standard_epoch_callback(epoch_odir, mod, eval_train, xobs, yobs, sobs, xtest
                         fvalid_eval_time, evalid_eval_time)
     if return_pdict:
         return pdict, eval_time_tuples
+
     return eval_time_tuples
 
