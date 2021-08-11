@@ -10,7 +10,7 @@ import torch
 import warnings
 
 import sys
-script_dir = "../build/lib/ziggy/misc"
+script_dir = "../ziggy/misc"
 
 # Add the absolute directory  path containing your
 # module to the Python path
@@ -236,10 +236,6 @@ if(args.dataset != 'gaia'):
 # Fit Models    #
 #################
 
-#################
-# Fit Models    #
-#################
-
 if args.fit_models:
     # unpack data
     xobs, yobs, sobs = \
@@ -313,12 +309,7 @@ if args.fit_models:
 
 
     # set up args for data
-    data_kwargs = {#'xx1': xx1,
-                   #'xx2': xx2,
-                   #'xx3': xx3,
-                   #'vmin': vmin,
-                   #'vmax': vmax,
-                   'xobs': xobs[:, :],
+    data_kwargs = {'xobs': xobs[:, :],
                    'yobs': yobs[:, None],
                    'sobs': sobs[:, None],
                    'xinduce_grids': xinduce_grids,
@@ -402,6 +393,8 @@ ax.set_ylabel('ELBO')
 #ax.set_aspect('equal')
 plt.tight_layout() 
 plt.savefig(output_dir + "/elbo.pdf")    
+
+# plot update of kernel parameters if kernel learning is turned on
 
 try:
     sig2 = np.array(torch.load(model + "/sig2_trace.pkl"))
