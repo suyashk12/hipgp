@@ -504,7 +504,7 @@ def plot_posterior_grid(name, pretty_name=None,
         #ax.set_title('.'.join(name.split('-')[7:-3]))
         fig.savefig(os.path.join(odir, "posterior-fsig-z{0:.2f}.pdf".format(z)), bbox_inches='tight')
 
-        # plot residual and zscore                                                                                                                                                             
+        # plot residual and zscore for density predictions                                                                                                                                                          
         
         try:
             fig, ax = plt.figure(figsize=(6,6)), plt.gca()
@@ -528,7 +528,8 @@ def plot_posterior_grid(name, pretty_name=None,
             except:
                 pass
 
-        
+        # plot spatial distribution for zscores of density predictions
+
         try:
             fig, ax = plt.figure(figsize=(6,6)), plt.gca()
             zs = resid / pdict['fsig_grid'].squeeze().reshape(xx1.shape)
@@ -540,6 +541,8 @@ def plot_posterior_grid(name, pretty_name=None,
             fig.savefig(os.path.join(odir, "zscore-fgrid-z{0:0.2f}.pdf".format(z)), bbox_inches='tight')
         except:
             pass
+
+        # plot zscore histogram for density predictions
 
         try:
             fig, ax = plt.figure(figsize=(6,4)), plt.gca()
