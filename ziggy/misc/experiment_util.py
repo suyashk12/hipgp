@@ -583,8 +583,6 @@ def plot_posterior_grid(name, pretty_name=None,
                     bbox_inches='tight')
     except:
         pass
-    
-    plt.close("all")
 
     try:
 
