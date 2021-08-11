@@ -48,6 +48,7 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
 
     xall = dd['xobs'][idx]
     eall = dd['eobs'][idx]
+    # eerrall will be necessary for gaia data
     eerrall = dd['eobserr'][idx]
 
     try:
@@ -55,12 +56,14 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
     except:
         fall = None
 
+    # specify train and test slices
     train_idx = slice(0, Nobs, 1)
     test_idx = slice(-Ntest, None, 1)
 
     xlo, ylo, zlo = kwargs['xlo'], kwargs['xlo'], kwargs['zlo']
     xhi, yhi, zhi =  kwargs['xhi'], kwargs['xhi'], kwargs['zhi']
 
+    # isolate points in the desired spatial extent
     index = (xall[:,0] <= xhi) & (xall[:,0] >= xlo) & \
             (xall[:,1] <= yhi) & (xall[:,1] >= ylo) & \
             (xall[:,2] <= zhi) & (xall[:,2] >= zlo)
@@ -69,10 +72,11 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
     eall = eall[index]
     eerrall = eerrall[index]
 
+    # nz=1 won't work directly unless you already have fgrid_30_30_1.npy already. check the readme to find out what to do if that is the case
     if kwargs['small_box']: nz = 1
     else: nz = 3
 
-    # generate data with variable noise, [1/2 sig, 3/2 sig]                                                                                                                                    
+    # generate data with variable noise, [1/2 sig, 3/2 sig] (this is synthetic noise, only valid for simulation data)                                                                                                                                
     xobs = xall[train_idx,:]
     eobs = eall[train_idx]
     eerrobs = eerrall[train_idx]
@@ -82,9 +86,10 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
     sobs = rs.rand(len(eobs))*noise_std + half_std
     aobs = eobs + rs.randn(len(eobs))*sobs
 
+    # for gaia data, we have actual uncertainties we can use
     if(kwargs['dataset'] == 'gaia'):
-        sobs = eerrobs + 0.1
-        aobs = eobs
+        sobs = eerrobs + 0.1 # 0.1 is from systematic uncertanties
+        aobs = eobs # the gaia extinctions are already noise, no need to add noise to it, unlike simulation
 
     try:
         fobs = fall[train_idx]  # without noise
@@ -101,9 +106,9 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
         ftest = None
 
     nx = ny = 30
+
     x1_grid = np.linspace(xlo, xhi, nx)
     x2_grid = np.linspace(ylo, yhi, ny)
-
     x3_grid = np.linspace(zlo, zhi, nz)
 
     if(nz==1):
@@ -126,6 +131,7 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
             np.save(fgridfile, fgrid)
         #import pdb;pdb.set_trace(
 
+        # conversion from conventional units to mag/kpc
         fgrid = np.swapaxes(fgrid, 0, 1)/0.20022
 
     else:
@@ -156,7 +162,6 @@ def make_domain_data(vmin=None, vmax=None, **kwargs):
                      torch.linspace(zlo, zhi, kwargs['num_inducing_z'])]
 
     return ddict, xinduce_grids
-    #return ddict
 
 def make_data_plot(name, args, xobs, aobs, data_dict):
     # TODO create a integrated obs plot for domain data ... 
