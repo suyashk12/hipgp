@@ -28,7 +28,6 @@ def turn_off_ticks(ax):
     for line in ax.zaxis.get_ticklines():
         line.set_visible(False)
 
-
 def plot_val_at_zslices(xval, val, zidx_slices, select_idx_list, vmin_list, vmax_list, name, odir='./'):
     fig, axes = plt.subplots(2, 5, figsize=(6 * 5, 6 * 2))
     for i, ax in enumerate(axes[0]):
@@ -76,13 +75,14 @@ def plot_domain_rslt(odir, pdict):
 
     sns.set(font_scale = 1, style='whitegrid')
 
-    # load_dict
+    # load dictionary of predictions
     xtest = pdict['xtest']
 
-    # determining a "good" slice
+    # determining a "good" slice (in the z, or x3 direction) for predictions, centered at mean_z and with thickness 2*diff_z
     mean_z = 0
     diff_z = 0.05
 
+    # isolating indices within that fall within the slice
     inds = []
 
     for i in range(0, len(pdict['xtest'])):
@@ -92,21 +92,22 @@ def plot_domain_rslt(odir, pdict):
     # determining quantities from that slice
     xtest_slice = pdict['xtest'][inds]
 
+    # if extinctions are predicted, plot their distribution and their statistics
     try:
+
+        # get true extinctions from the testing set, the posterior mean and variance
         etest = pdict['etest']
         emu_test = pdict['emu_test']
         esig_test = pdict['esig_test']
 
+        # calculate residual, relative error, and z-score for predictions viz-a-viz the true values
         eres_test = emu_test - etest
         erel_test = eres_test/etest
         ez_test = -eres_test/esig_test
 
-        # integrated
+        # 3-D plots
 
         # posterior mean
-
-        # integrated
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca(projection='3d')
         im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=emu_test, s=20)
@@ -119,8 +120,7 @@ def plot_domain_rslt(odir, pdict):
         plt.savefig(os.path.join(odir, "predict-emu-test-3D.pdf"), dpi = 300, transparent = True)
         plt.close()
 
-        # error
-
+        # posterior variance
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca(projection='3d')
         im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=esig_test, s=20)
@@ -134,7 +134,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # residual
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca(projection='3d')
         im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=eres_test, s=20)
@@ -148,7 +147,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # relative error
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca(projection='3d')
         im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=erel_test, s=20)
@@ -162,7 +160,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # z-score
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca(projection='3d')
         im = ax.scatter(xtest[:, 0], xtest[:, 1], xtest[:, 2], c=ez_test, s=20)
@@ -175,6 +172,8 @@ def plot_domain_rslt(odir, pdict):
         plt.savefig(os.path.join(odir, "predict-ez-test-3D.pdf"), dpi = 300, transparent = True)
         plt.close()
 
+        # get true extinctions, posterior mean and variance, and statistics within the slice
+
         etest_slice = pdict['etest'][inds]
         emu_test_slice = pdict['emu_test'][inds]
         esig_test_slice = pdict["esig_test"][inds]
@@ -182,10 +181,9 @@ def plot_domain_rslt(odir, pdict):
         erel_test_slice = eres_test_slice/etest_slice
         ez_test_slice = -eres_test_slice/esig_test_slice
 
-        # integrated
+        # 2-D plots
 
-        # prediction
-
+        # posterior mean
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca()
         im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = emu_test_slice)
@@ -198,8 +196,7 @@ def plot_domain_rslt(odir, pdict):
         plt.savefig(os.path.join(odir, "predict-emu-test-2D.pdf"), dpi = 300, transparent = True)
         plt.close()
 
-        # error
-
+        # posterior variance
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca()
         im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = esig_test_slice)
@@ -213,7 +210,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # residual
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca()
         im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = eres_test_slice)
@@ -227,7 +223,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # relative error
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca()
         im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = erel_test_slice)
@@ -241,7 +236,6 @@ def plot_domain_rslt(odir, pdict):
         plt.close()
 
         # z-score
-
         fig = plt.figure(figsize = (6, 6))
         ax = plt.gca()
         im = ax.scatter(xtest_slice[:, 0], xtest_slice[:, 1], c = ez_test_slice)
@@ -261,10 +255,14 @@ def plot_domain_true(data_dict, output_dir):
 
     sns.set(font_scale = 1, style='whitegrid')
 
+    # getting spatial extents for plots
+
     xlo = data_dict['xlo']
     xhi = data_dict['xhi']
     zlo = data_dict['zlo']
     zhi = data_dict['zhi']
+
+    # 3-D plots
 
     # plot training set
     fig = plt.figure(figsize = (8, 6))
@@ -281,10 +279,8 @@ def plot_domain_true(data_dict, output_dir):
     ax.set_box_aspect([2,2,1])
     plt.savefig(os.path.join(output_dir, "true-eobs-3D.pdf"), dpi = 300, transparent = True)
     plt.close()
-
-    # 3D plots
     
-    # integrated
+    # plot testing set
     fig = plt.figure(figsize = (8, 6))
     ax = plt.gca(projection='3d')
     ax.set_xlim(xlo, xhi)
@@ -304,10 +300,11 @@ def plot_domain_true(data_dict, output_dir):
 
     # training set
 
-    # determining a "good" slice
+    # determining a "good" slice (in the z, or x3 direction) for training set, centered at mean_obs_z and with thickness 2*diff_obs_z
     mean_obs_z = 0
     diff_obs_z = 0.05
 
+    # isolating indices that fall within the slice
     inds = []
 
     for i in range(0, len(data_dict['xtest'])):
@@ -318,7 +315,7 @@ def plot_domain_true(data_dict, output_dir):
     xtest_slice = data_dict['xobs'][inds]
     etest_slice = data_dict['eobs'][inds]
 
-    # integrated
+    # plot training set
     fig = plt.figure(figsize = (6, 6))
     ax = plt.gca()
     ax.set_xlim(xlo, xhi)
@@ -333,23 +330,22 @@ def plot_domain_true(data_dict, output_dir):
     plt.savefig(os.path.join(output_dir, "true-eobs-2D.pdf"), dpi = 300, transparent = True)
     plt.close()
 
-    # determining a "good" slice
+    # determining a "good" slice (in the z, or x3 direction) for testing set, centered at mean_test_z and with thickness 2*diff_test_z
     mean_test_z = 0
     diff_test_z = 0.05
 
+    # isolating indices that fall within the slice
     inds = []
 
     for i in range(0, len(data_dict['xtest'])):
         if(data_dict['xtest'][i][2] >= mean_test_z - diff_test_z and data_dict['xtest'][i][2] <= mean_test_z + diff_test_z):
             inds.append(i)
 
-    # testing set
-
     # determining quantities from that slice
     xtest_slice = data_dict['xtest'][inds]
     etest_slice = data_dict['etest'][inds]
 
-    # integrated
+    # plot testing set
     fig = plt.figure(figsize = (6, 6))
     ax = plt.gca()
     ax.set_xlim(xlo, xhi)
